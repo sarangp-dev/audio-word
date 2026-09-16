@@ -34,3 +34,11 @@ A web application for working with audio and words.
 
 &#x20;Project is currently under development.
 
+\# style used in 
+
+
+
+&#x20;neuraphormic
+
+
+
