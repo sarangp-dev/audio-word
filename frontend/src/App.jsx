@@ -14,9 +14,7 @@ function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Audioinput />} />
-
           <Route path="/input" element={<Audioinput />} />
-
         </Routes>
       </BrowserRouter>
 

@@ -1,4 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
+import axios from 'axios';
 import { Mic, Square, Loader2, Download, Music } from "lucide-react";
 import './style.css';
 
@@ -11,9 +12,10 @@ const Audioinput = () => {
 
     const mediaRecorderRef = useRef(null);
     const audioChunksRef = useRef([]);
+    const streamRef = useRef(null);
     const fileInputRef = useRef(null);
 
-    // Keep object URL in sync with audioFile state and clean up memory
+    // Sync object URL with audioFile and avoid memory leaks
     useEffect(() => {
         if (!audioFile) {
             setAudioUrl(null);
@@ -26,34 +28,48 @@ const Audioinput = () => {
         return () => URL.revokeObjectURL(url);
     }, [audioFile]);
 
+    // Cleanup active mic tracks if component unmounts
+    useEffect(() => {
+        return () => {
+            if (streamRef.current) {
+                streamRef.current.getTracks().forEach((track) => track.stop());
+            }
+        };
+    }, []);
+
     const startRecording = async () => {
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({
-                audio: true,
-            });
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            streamRef.current = stream;
 
             const recorder = new MediaRecorder(stream);
             mediaRecorderRef.current = recorder;
             audioChunksRef.current = [];
 
             recorder.ondataavailable = (event) => {
-                if (event.data.size > 0) {
+                if (event.data && event.data.size > 0) {
                     audioChunksRef.current.push(event.data);
                 }
             };
 
             recorder.onstop = () => {
-                const audioBlob = new Blob(audioChunksRef.current, {
+                const recordedBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+                const recordedFile = new File([recordedBlob], "Microphone-Recording.webm", {
                     type: "audio/webm",
                 });
-                setAudioFile(audioBlob);
-                stream.getTracks().forEach((track) => track.stop());
+                setAudioFile(recordedFile);
+
+                if (streamRef.current) {
+                    streamRef.current.getTracks().forEach((track) => track.stop());
+                    streamRef.current = null;
+                }
             };
 
             recorder.start();
             setIsRecording(true);
         } catch (error) {
-            console.error("Error accessing microphone:", error);
+            console.error("Microphone access failed:", error);
+            alert("Unable to access microphone. Please check browser permissions.");
         }
     };
 
@@ -74,9 +90,30 @@ const Audioinput = () => {
         }
     };
 
+    const handledelete = (e) => {
+        if (e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        setAudioFile(null);
+        setCloudImageUrl(null);
+        audioChunksRef.current = [];
+
+        if (fileInputRef.current) {
+            fileInputRef.current.value = "";
+        }
+    };
+
     const handleAnalyze = async () => {
         if (!audioFile) {
             alert("Please record or select an audio file first.");
+            return;
+        }
+
+        const endpoint = import.meta.env.VITE_AUDIO_UPLOAD;
+        if (!endpoint) {
+            alert("Upload endpoint is not configured in environment variables.");
             return;
         }
 
@@ -84,13 +121,24 @@ const Audioinput = () => {
         setCloudImageUrl(null);
 
         try {
-            // Replace this mock timeout with your actual backend upload/generation API
-            await new Promise((resolve) => setTimeout(resolve, 3000));
+            const formData = new FormData();
+            formData.append("audio", audioFile);
 
-            // Set placeholder image or backend response URL
-            setCloudImageUrl("https://picsum.photos/600/300");
+            const response = await axios.post(endpoint, formData, {
+                headers: { "Content-Type": "multipart/form-data" },
+            });
+
+            // Set returned cloud image URL or fallback placeholder
+            const generatedUrl = response.data?.imageUrl || response.data?.url || "https://picsum.photos/600/300";
+            setCloudImageUrl(generatedUrl);
+            alert("Audio processed successfully!");
         } catch (error) {
-            console.error("Error generating cloud:", error);
+            console.error("Upload error:", error);
+            const message =
+                error.response?.data?.message ||
+                error.message ||
+                "Failed to process audio file.";
+            alert(message);
         } finally {
             setIsAnalyzing(false);
         }
@@ -104,12 +152,6 @@ const Audioinput = () => {
         link.click();
     };
 
-    const handledelete = () => {
-        setAudioFile(null);
-        audioUrl(null);
-
-
-    }
     return (
         <main className="app-container">
             <div className="app-card">
@@ -171,7 +213,7 @@ const Audioinput = () => {
                             onClick={() => fileInputRef.current?.click()}
                             style={{ cursor: 'pointer' }}
                         >
-                            {audioFile ? (
+                            {audioUrl ? (
                                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', width: '100%' }}>
                                     <Music size={28} />
                                     <span style={{ fontSize: '0.9rem', fontWeight: 500 }}>
@@ -211,6 +253,7 @@ const Audioinput = () => {
                                 style={{ display: 'none' }}
                             />
                         </div>
+
                         {!audioFile ? (
                             <div className="action-row" >
                                 <button
@@ -224,9 +267,8 @@ const Audioinput = () => {
                                     </svg>
                                     <span>{isAnalyzing ? "Processing Audio..." : "Analyse & Generate Cloud"}</span>
                                 </button>
-
-                            </div>) : (
-
+                            </div>
+                        ) : (
                             <div
                                 className="action-row"
                                 style={{
@@ -261,7 +303,7 @@ const Audioinput = () => {
                                     className="submit-btn"
                                     type="button"
                                     onClick={handledelete}
-
+                                    disabled={isAnalyzing}
                                     style={{
                                         flex: '1 1 0',
                                         minWidth: 0,
@@ -274,7 +316,6 @@ const Audioinput = () => {
                                         gap: '8px'
                                     }}
                                 >
-
                                     <svg
                                         viewBox="0 0 24 24"
                                         width="18"
@@ -295,8 +336,8 @@ const Audioinput = () => {
                                         Delete
                                     </span>
                                 </button>
-                            </div>)}
-
+                            </div>
+                        )}
                     </section>
 
                     {/* Word Cloud Result Section */}
