@@ -1,7 +1,62 @@
 import React from 'react';
+import { Mic, Square } from "lucide-react";
+import { useRef, useState } from "react";
 import './style.css';
 
 const Audioinput = () => {
+    const [isRecording, setIsRecording] = useState(false);
+    const [audioFile, setAudioFile] = useState(null);
+
+    const mediaRecorderRef = useRef(null);
+    const audioChunksRef = useRef([]);
+
+    const startRecording = async () => {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+                audio: true,
+            });
+
+            const recorder = new MediaRecorder(stream);
+
+            mediaRecorderRef.current = recorder;
+            audioChunksRef.current = [];
+
+            recorder.ondataavailable = (event) => {
+                if (event.data.size > 0) {
+                    audioChunksRef.current.push(event.data);
+                }
+            };
+
+            recorder.onstop = () => {
+                const audioBlob = new Blob(audioChunksRef.current, {
+                    type: "audio/webm",
+                });
+
+                setAudioFile(audioBlob);
+
+                // Stop microphone AFTER recording stops
+                stream.getTracks().forEach((track) => track.stop());
+            };
+
+            // Start recording
+            recorder.start();
+
+            setIsRecording(true);
+
+        } catch (error) {
+            console.error("Error accessing microphone:", error);
+        }
+    };
+
+    const stopRecording = () => {
+        if (
+            mediaRecorderRef.current &&
+            mediaRecorderRef.current.state !== "inactive"
+        ) {
+            mediaRecorderRef.current.stop();
+            setIsRecording(false);
+        }
+    };
     return (
         <main className="app-container">
             <div className="app-card">
@@ -25,21 +80,41 @@ const Audioinput = () => {
                 </header>
 
                 <div className="workspace-grid">
+
                     <section className="record-section">
                         <h2 className="section-label">Live Session Recording</h2>
+
                         <div className="glow-disc">
-                            <button className="play-btn" aria-label="Start Recording">
-                                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#f7f6ec" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
-                                    <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
-                                    <line x1="12" y1="19" x2="12" y2="23"></line>
-                                    <line x1="8" y1="23" x2="16" y2="23"></line>
-                                </svg>
+
+                            <button
+                                className={isRecording ? "stop-btn" : "play-btn"}
+                                aria-label={
+                                    isRecording ? "Stop Recording" : "Start Recording"
+                                }
+                                onClick={
+                                    isRecording ? stopRecording : startRecording
+                                }
+                            >
+                                {isRecording ? (
+                                    <Square size={26} strokeWidth={2.5} />
+                                ) : (
+                                    <Mic size={28} strokeWidth={2.5} />
+                                )}
                             </button>
-                            <span className="start-text">Record Live</span>
+
+                            <span className="start-text">
+                                {isRecording ? "Recording..." : "Record Live"}
+                            </span>
+
                         </div>
-                        <p className="hint-text">Click to start live capture with mic</p>
+
+                        <p className="hint-text">
+                            {isRecording
+                                ? "Recording is in progress"
+                                : "Click to start live capture with mic"}
+                        </p>
                     </section>
+
 
                     <section className="upload-section">
                         <h2 className="section-label">Or Upload Session Audio</h2>
@@ -69,7 +144,12 @@ const Audioinput = () => {
                         </div>
                     </section>
                 </div>
-
+                <div>{audioFile && (
+                    <audio
+                        controls
+                        src={URL.createObjectURL(audioFile)}
+                    />
+                )}</div>
                 <nav className="bottom-nav">
                     <a href="#record" className="nav-item active">
                         <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round">

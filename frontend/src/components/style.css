@@ -320,3 +320,38 @@ body {
         display: none;
     }
 }
+
+.play-btn,
+.stop-btn {
+    width: 70px;
+    height: 70px;
+    border-radius: 50%;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: white;
+    transition: all 0.3s ease;
+}
+
+/* Start recording */
+.play-btn {
+    background: #4a5d4e;
+}
+
+.play-btn:hover {
+    background: #4f6e56;
+    transform: scale(1.05);
+}
+
+/* Stop recording */
+.stop-btn {
+    background: #d64545;
+    box-shadow: 0 0 25px rgba(214, 69, 69, 0.5);
+}
+
+.stop-btn:hover {
+    background: #ef5350;
+    transform: scale(1.05);
+}
