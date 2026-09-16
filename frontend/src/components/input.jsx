@@ -300,13 +300,14 @@ const Audioinput = () => {
 
 
                     <section className="upload-section">
-                        <h2 className="section-label">Or Upload Session Audio</h2>
+
 
                         <div
                             className="dropzone-box"
                             onClick={() => fileInputRef.current?.click()}
                             style={{ cursor: 'pointer' }}
                         >
+                            <h2 className="section-label">Or Upload Session Audio</h2>
                             {audioUrl ? (
                                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', width: '100%' }}>
                                     <Music size={28} />
@@ -349,75 +350,79 @@ const Audioinput = () => {
                                 onChange={handleFileUpload}
                                 style={{ display: 'none' }}
                             />
-                        </div>
 
-                        {!audioFile ? (
-                            <div className="action-row">
-                                <button
-                                    className="submit-btn"
-                                    type="button"
-                                    onClick={handleAnalyze}
-                                    disabled={true}
-                                >
-                                    <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round">
-                                        <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"></path>
-                                    </svg>
-                                    <span>Record or Select Audio First</span>
-                                </button>
-                            </div>
-                        ) : (
-                            <div
-                                className="action-row"
-                                style={{
-                                    display: 'flex',
-                                    flexDirection: 'row',
-                                    alignItems: 'center',
-                                    gap: '12px',
-                                    width: '100%',
-                                    boxSizing: 'border-box'
-                                }}
-                            >
-                                <button
-                                    className="submit-btn"
-                                    type="button"
-                                    onClick={handleAnalyze}
-                                    disabled={isAnalyzing}
+
+                        </div>
+                        <div>
+
+                            {!audioFile ? (
+                                <div className="action-row">
+                                    <button
+                                        className="submit-btn"
+                                        type="button"
+                                        onClick={handleAnalyze}
+                                        disabled={true}
+                                    >
+                                        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round">
+                                            <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"></path>
+                                        </svg>
+                                        <span>Record or Select Audio First</span>
+                                    </button>
+                                </div>
+                            ) : (
+                                <div
+                                    className="action-row"
                                     style={{
-                                        flex: '1 1 0',
-                                        minWidth: 0,
-                                        width: 'auto',
-                                        whiteSpace: 'nowrap'
-                                    }}
-                                >
-                                    <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round">
-                                        <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"></path>
-                                    </svg>
-                                    <span style={{ textOverflow: 'ellipsis', overflow: 'hidden' }}>
-                                        {isAnalyzing ? "Processing..." : "Analyse & Generate"}
-                                    </span>
-                                </button>
-                                <button
-                                    className="submit-btn"
-                                    type="button"
-                                    onClick={handledelete}
-                                    disabled={isAnalyzing}
-                                    style={{
-                                        flex: '1 1 0',
-                                        minWidth: 0,
-                                        width: 'auto',
-                                        whiteSpace: 'nowrap',
-                                        background: '#ef4444',
-                                        display: 'inline-flex',
+                                        display: 'flex',
+                                        flexDirection: 'row',
                                         alignItems: 'center',
-                                        justifyContent: 'center',
-                                        gap: '8px'
+                                        gap: '12px',
+                                        width: '100%',
+                                        boxSizing: 'border-box'
                                     }}
                                 >
-                                    <Square size={16} />
-                                    <span>Discard</span>
-                                </button>
-                            </div>
-                        )}
+                                    <button
+                                        className="submit-btn"
+                                        type="button"
+                                        onClick={handleAnalyze}
+                                        disabled={isAnalyzing}
+                                        style={{
+                                            flex: '1 1 0',
+                                            minWidth: 0,
+                                            width: 'auto',
+                                            whiteSpace: 'nowrap'
+                                        }}
+                                    >
+                                        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round">
+                                            <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"></path>
+                                        </svg>
+                                        <span style={{ textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                                            {isAnalyzing ? "Processing..." : "Analyse & Generate"}
+                                        </span>
+                                    </button>
+                                    <button
+                                        className="submit-btn"
+                                        type="button"
+                                        onClick={handledelete}
+                                        disabled={isAnalyzing}
+                                        style={{
+                                            flex: '1 1 0',
+                                            minWidth: 0,
+                                            width: 'auto',
+                                            whiteSpace: 'nowrap',
+                                            background: '#ef4444',
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            gap: '8px'
+                                        }}
+                                    >
+                                        <Square size={16} />
+                                        <span>Discard</span>
+                                    </button>
+                                </div>
+                            )}
+                        </div>
                     </section>
 
                     {/* Word Cloud Result Section */}
