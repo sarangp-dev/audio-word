@@ -1,19 +1,46 @@
 import React, { useRef, useState, useEffect } from 'react';
 import axios from 'axios';
-import { Mic, Square, Loader2, Download, Music } from "lucide-react";
+import WordCloud from 'wordcloud';
+import { Mic, Square, Loader2, Download, Music, AlertCircle } from "lucide-react";
 import './style.css';
+
+const ALLOWED_EXTENSIONS = [".mp3", ".wav", ".m4a", ".aac", ".ogg", ".webm", ".flac"];
+const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25 MB limit[cite: 1]
 
 const Audioinput = () => {
     const [isRecording, setIsRecording] = useState(false);
+    const [recordingTime, setRecordingTime] = useState(0);
     const [audioFile, setAudioFile] = useState(null);
     const [audioUrl, setAudioUrl] = useState(null);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
-    const [cloudImageUrl, setCloudImageUrl] = useState(null);
+    const [words, setWords] = useState(null);
+    const [errorMessage, setErrorMessage] = useState("");
 
     const mediaRecorderRef = useRef(null);
     const audioChunksRef = useRef([]);
     const streamRef = useRef(null);
     const fileInputRef = useRef(null);
+    const timerRef = useRef(null);
+    const canvasRef = useRef(null);
+    const canvasContainerRef = useRef(null);
+
+    // Live recording elapsed timer[cite: 1]
+    useEffect(() => {
+        if (isRecording) {
+            timerRef.current = setInterval(() => {
+                setRecordingTime((prev) => prev + 1);
+            }, 1000);
+        } else {
+            clearInterval(timerRef.current);
+        }
+        return () => clearInterval(timerRef.current);
+    }, [isRecording]);
+
+    const formatTime = (totalSeconds) => {
+        const mins = Math.floor(totalSeconds / 60).toString().padStart(2, "0");
+        const secs = (totalSeconds % 60).toString().padStart(2, "0");
+        return `${mins}:${secs}`;
+    };
 
     // Sync object URL with audioFile and avoid memory leaks
     useEffect(() => {
@@ -37,7 +64,40 @@ const Audioinput = () => {
         };
     }, []);
 
+    // Render word cloud on canvas when words state updates[cite: 1]
+    useEffect(() => {
+        if (!words || words.length === 0 || !canvasRef.current) return;
+
+        const canvas = canvasRef.current;
+        const container = canvasContainerRef.current;
+
+        const targetWidth = container ? container.offsetWidth : 600;
+        const targetHeight = 320;
+
+        canvas.width = targetWidth;
+        canvas.height = targetHeight;
+
+        const formattedList = words.map((w) => [w.text, w.value]);
+
+        WordCloud(canvas, {
+            list: formattedList,
+            gridSize: Math.round(16 * targetWidth / 1024),
+            weightFactor: (size) => Math.max(14, (size / 100) * 44),
+            fontFamily: "Inter, sans-serif",
+            color: () => {
+                const palette = ["#2563eb", "#0284c7", "#0d9488", "#4f46e5", "#7c3aed", "#059669"];
+                return palette[Math.floor(Math.random() * palette.length)];
+            },
+            rotateRatio: 0.3,
+            rotationSteps: 2,
+            backgroundColor: "#ffffff",
+            drawOutOfBound: false,
+        });
+    }, [words]);
+
     const startRecording = async () => {
+        setErrorMessage("");
+        setWords(null);
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             streamRef.current = stream;
@@ -66,10 +126,15 @@ const Audioinput = () => {
             };
 
             recorder.start();
+            setRecordingTime(0);
             setIsRecording(true);
         } catch (error) {
             console.error("Microphone access failed:", error);
-            alert("Unable to access microphone. Please check browser permissions.");
+            if (error.name === "NotAllowedError" || error.name === "PermissionDeniedError") {
+                setErrorMessage("Microphone access was denied. Please allow microphone permissions in your browser settings.");
+            } else {
+                setErrorMessage("Unable to access microphone. Please check your audio input device.");
+            }
         }
     };
 
@@ -84,10 +149,25 @@ const Audioinput = () => {
     };
 
     const handleFileUpload = (e) => {
+        setErrorMessage("");
         const file = e.target.files?.[0];
-        if (file) {
-            setAudioFile(file);
+        if (!file) return;
+
+        const fileExt = "." + file.name.split(".").pop().toLowerCase();
+        if (!ALLOWED_EXTENSIONS.includes(fileExt)) {
+            setErrorMessage(`Invalid audio format (${fileExt}). Allowed: ${ALLOWED_EXTENSIONS.join(", ")}`);
+            if (fileInputRef.current) fileInputRef.current.value = "";
+            return;
         }
+
+        if (file.size > MAX_FILE_SIZE) {
+            setErrorMessage("File exceeds the 25 MB limit. Please select a smaller recording.");
+            if (fileInputRef.current) fileInputRef.current.value = "";
+            return;
+        }
+
+        setWords(null);
+        setAudioFile(file);
     };
 
     const handledelete = (e) => {
@@ -97,7 +177,9 @@ const Audioinput = () => {
         }
 
         setAudioFile(null);
-        setCloudImageUrl(null);
+        setWords(null);
+        setErrorMessage("");
+        setRecordingTime(0);
         audioChunksRef.current = [];
 
         if (fileInputRef.current) {
@@ -107,18 +189,15 @@ const Audioinput = () => {
 
     const handleAnalyze = async () => {
         if (!audioFile) {
-            alert("Please record or select an audio file first.");
+            setErrorMessage("Please record or select an audio file first.");
             return;
         }
 
-        const endpoint = import.meta.env.VITE_AUDIO_UPLOAD;
-        if (!endpoint) {
-            alert("Upload endpoint is not configured in environment variables.");
-            return;
-        }
+        const endpoint = import.meta.env.VITE_AUDIO_UPLOAD || "http://localhost:5000/api/upload";
 
         setIsAnalyzing(true);
-        setCloudImageUrl(null);
+        setErrorMessage("");
+        setWords(null);
 
         try {
             const formData = new FormData();
@@ -128,28 +207,36 @@ const Audioinput = () => {
                 headers: { "Content-Type": "multipart/form-data" },
             });
 
-            // Set returned cloud image URL or fallback placeholder
-            const generatedUrl = response.data?.imageUrl || response.data?.url || "https://picsum.photos/600/300";
-            setCloudImageUrl(generatedUrl);
-            alert("Audio processed successfully!");
+            if (response.data?.words && Array.isArray(response.data.words)) {
+                setWords(response.data.words);
+            } else {
+                throw new Error("No prominent terms were detected from the recording.");
+            }
         } catch (error) {
             console.error("Upload error:", error);
             const message =
                 error.response?.data?.message ||
                 error.message ||
                 "Failed to process audio file.";
-            alert(message);
+            setErrorMessage(message);
         } finally {
             setIsAnalyzing(false);
         }
     };
 
+    // Native canvas to PNG download[cite: 1]
     const handleDownload = () => {
-        if (!cloudImageUrl) return;
-        const link = document.createElement("a");
-        link.href = cloudImageUrl;
-        link.download = "session-word-cloud.png";
-        link.click();
+        if (!canvasRef.current) return;
+        try {
+            const imageUri = canvasRef.current.toDataURL("image/png");
+            const link = document.createElement("a");
+            link.download = "mentorship-word-cloud.png";
+            link.href = imageUri;
+            link.click();
+        } catch (err) {
+            console.error("Failed to export PNG:", err);
+            setErrorMessage("Failed to export word cloud image.");
+        }
     };
 
     return (
@@ -170,9 +257,27 @@ const Audioinput = () => {
                         <svg className="leaf-icon" viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
                             <circle cx="12" cy="12" r="6" />
                         </svg>
-                        <span>{isRecording ? "Live" : "Ready: 00:00"}</span>
+                        <span>{isRecording ? `Rec: ${formatTime(recordingTime)}` : "Ready"}</span>
                     </div>
                 </header>
+
+                {errorMessage && (
+                    <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        backgroundColor: '#fef2f2',
+                        color: '#b91c1c',
+                        border: '1px solid #fecaca',
+                        padding: '10px 14px',
+                        borderRadius: '8px',
+                        margin: '12px 20px 0',
+                        fontSize: '0.875rem'
+                    }}>
+                        <AlertCircle size={18} style={{ flexShrink: 0 }} />
+                        <span>{errorMessage}</span>
+                    </div>
+                )}
 
                 <div className="workspace-grid">
                     {/* Live Recording Section */}
@@ -193,14 +298,14 @@ const Audioinput = () => {
                             </button>
 
                             <span className="start-text">
-                                {isRecording ? "Recording..." : "Record Live"}
+                                {isRecording ? `Recording (${formatTime(recordingTime)})` : "Record Live"}
                             </span>
                         </div>
 
                         <p className="hint-text">
                             {isRecording
-                                ? "Recording is in progress"
-                                : "Click to start live capture with mic"}
+                                ? "Recording in progress. Click square to stop."
+                                : "Click mic to start live capture (Max 10 min)"}
                         </p>
                     </section>
 
@@ -214,10 +319,13 @@ const Audioinput = () => {
                             style={{ cursor: 'pointer' }}
                         >
                             {audioUrl ? (
-                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', width: '100%' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', width: '100%' }}>
                                     <Music size={28} />
-                                    <span style={{ fontSize: '0.9rem', fontWeight: 500 }}>
+                                    <span style={{ fontSize: '0.9rem', fontWeight: 500, wordBreak: 'break-all', textAlign: 'center', padding: '0 8px' }}>
                                         {audioFile.name || "Microphone Recording.webm"}
+                                    </span>
+                                    <span style={{ fontSize: '0.75rem', opacity: 0.7 }}>
+                                        Size: {(audioFile.size / (1024 * 1024)).toFixed(2)} MB
                                     </span>
                                     <audio
                                         controls
@@ -226,7 +334,7 @@ const Audioinput = () => {
                                         onClick={(e) => e.stopPropagation()}
                                     />
                                     <span style={{ fontSize: '0.75rem', opacity: 0.7 }}>
-                                        Click to change file
+                                        Click container to replace file
                                     </span>
                                 </div>
                             ) : (
@@ -255,17 +363,17 @@ const Audioinput = () => {
                         </div>
 
                         {!audioFile ? (
-                            <div className="action-row" >
+                            <div className="action-row">
                                 <button
                                     className="submit-btn"
                                     type="button"
                                     onClick={handleAnalyze}
-                                    disabled={isAnalyzing || !audioFile}
+                                    disabled={true}
                                 >
                                     <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round">
                                         <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"></path>
                                     </svg>
-                                    <span>{isAnalyzing ? "Processing Audio..." : "Analyse & Generate Cloud"}</span>
+                                    <span>Record or Select Audio First</span>
                                 </button>
                             </div>
                         ) : (
@@ -284,7 +392,7 @@ const Audioinput = () => {
                                     className="submit-btn"
                                     type="button"
                                     onClick={handleAnalyze}
-                                    disabled={isAnalyzing || !audioFile}
+                                    disabled={isAnalyzing}
                                     style={{
                                         flex: '1 1 0',
                                         minWidth: 0,
@@ -316,49 +424,43 @@ const Audioinput = () => {
                                         gap: '8px'
                                     }}
                                 >
-                                    <svg
-                                        viewBox="0 0 24 24"
-                                        width="18"
-                                        height="18"
-                                        stroke="currentColor"
-                                        strokeWidth="2"
-                                        fill="none"
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                    >
-                                        <path d="M3 6h18" />
-                                        <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
-                                        <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-                                        <line x1="10" y1="11" x2="10" y2="17" />
-                                        <line x1="14" y1="11" x2="14" y2="17" />
-                                    </svg>
-                                    <span style={{ textOverflow: 'ellipsis', overflow: 'hidden' }}>
-                                        Delete
-                                    </span>
+                                    <Square size={16} />
+                                    <span>Discard</span>
                                 </button>
                             </div>
                         )}
                     </section>
 
                     {/* Word Cloud Result Section */}
-                    <section className="upload-section" style={{ gridColumn: 'span 2', marginLeft: '10%', marginRight: '10%' }}>
+                    <section className="upload-section" style={{ gridColumn: 'span 2', marginLeft: '5%', marginRight: '5%' }}>
                         <h2 className="section-label">Generated Word Cloud</h2>
 
-                        <div className="dropzone-box" style={{ minHeight: '220px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <div
+                            ref={canvasContainerRef}
+                            className="dropzone-box"
+                            style={{
+                                minHeight: '320px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                padding: '12px',
+                                background: '#ffffff',
+                                overflow: 'hidden'
+                            }}
+                        >
                             {isAnalyzing ? (
                                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
                                     <Loader2 className="spinner" size={36} style={{ animation: 'spin 1s linear infinite' }} />
-                                    <span>Generating word cloud visualization...</span>
+                                    <span>Transcribing audio & extracting topics with AI...</span>
                                 </div>
-                            ) : cloudImageUrl ? (
-                                <img
-                                    src={cloudImageUrl}
-                                    alt="Generated Word Cloud"
-                                    style={{ maxWidth: '100%', maxHeight: '200px', objectFit: 'contain', borderRadius: '8px' }}
+                            ) : words && words.length > 0 ? (
+                                <canvas
+                                    ref={canvasRef}
+                                    style={{ width: '100%', height: '320px', display: 'block' }}
                                 />
                             ) : (
                                 <span style={{ opacity: 0.6, fontSize: '0.9rem' }}>
-                                    Generated cloud will appear here
+                                    Your generated word cloud will render here after analysis
                                 </span>
                             )}
                         </div>
@@ -368,39 +470,14 @@ const Audioinput = () => {
                                 className="submit-btn"
                                 type="button"
                                 onClick={handleDownload}
-                                disabled={!cloudImageUrl || isAnalyzing}
+                                disabled={!words || isAnalyzing}
                             >
                                 <Download size={18} />
-                                <span>Download Word Cloud</span>
+                                <span>Download Word Cloud (PNG)</span>
                             </button>
                         </div>
                     </section>
                 </div>
-
-                <nav className="bottom-nav">
-                    <a href="#record" className="nav-item active">
-                        <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
-                            <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
-                            <line x1="12" y1="19" x2="12" y2="23"></line>
-                        </svg>
-                        <span>Capture</span>
-                    </a>
-                    <a href="#cloud" className="nav-item">
-                        <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"></path>
-                        </svg>
-                        <span>Word Cloud</span>
-                    </a>
-                    <a href="#transcript" className="nav-item">
-                        <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                            <polyline points="14 2 14 8 20 8"></polyline>
-                            <line x1="16" y1="13" x2="8" y2="13"></line>
-                        </svg>
-                        <span>History</span>
-                    </a>
-                </nav>
             </div>
         </main>
     );
