@@ -1,18 +1,16 @@
 :root {
   --bg-color: #f7f6ec;
+  --card-bg: #fdfdf9;
   --text-dark: #374744;
   --text-muted: #798683;
   --primary-accent: #4a5d4e;
+  --primary-hover: #3d4f41;
+  --danger-accent: #dc2626;
 
-  --shadow-raised:
-    -4px -4px 10px rgba(255, 255, 255, 0.95),
-    4px 4px 12px rgba(188, 185, 169, 0.45);
-
-  --shadow-inset:
-    inset 3px 3px 6px rgba(188, 185, 169, 0.5),
-    inset -3px -3px 6px rgba(255, 255, 255, 0.95);
-
-  --disc-shadow:
-    -10px -10px 24px rgba(255, 255, 255, 0.95),
-    10px 14px 28px rgba(195, 192, 175, 0.55);
+  --shadow-raised: -4px -4px 10px rgba(255, 255, 255, 0.95),
+    4px 4px 12px rgba(188, 185, 169, 0.4);
+  --shadow-inset: inset 2px 2px 5px rgba(188, 185, 169, 0.45),
+    inset -2px -2px 5px rgba(255, 255, 255, 0.95);
+  --disc-shadow: -8px -8px 20px rgba(255, 255, 255, 0.95),
+    8px 10px 22px rgba(195, 192, 175, 0.5);
 }

@@ -170,13 +170,9 @@ const Audioinput = () => {
         setAudioFile(file);
     };
 
-    const handledelete = (e) => {
-        if (e) {
-            e.preventDefault();
-            e.stopPropagation();
-        }
-
+    const handledelete = () => {
         setAudioFile(null);
+        setAudioUrl(null);
         setWords(null);
         setErrorMessage("");
         setRecordingTime(0);
@@ -186,7 +182,6 @@ const Audioinput = () => {
             fileInputRef.current.value = "";
         }
     };
-
     const handleAnalyze = async () => {
         if (!audioFile) {
             setErrorMessage("Please record or select an audio file first.");
@@ -243,13 +238,7 @@ const Audioinput = () => {
         <main className="app-container">
             <div className="app-card">
                 <header className="top-nav">
-                    <button className="icon-btn" aria-label="Menu">
-                        <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round">
-                            <line x1="4" y1="7" x2="20" y2="7"></line>
-                            <line x1="4" y1="12" x2="20" y2="12"></line>
-                            <line x1="4" y1="17" x2="20" y2="17"></line>
-                        </svg>
-                    </button>
+
 
                     <h1 className="app-title">Session Word Cloud</h1>
 
@@ -280,7 +269,7 @@ const Audioinput = () => {
                 )}
 
                 <div className="workspace-grid">
-                    {/* Live Recording Section */}
+
                     <section className="record-section">
                         <h2 className="section-label">Live Session Recording</h2>
 
@@ -309,7 +298,7 @@ const Audioinput = () => {
                         </p>
                     </section>
 
-                    {/* Upload & Audio Preview Section */}
+
                     <section className="upload-section">
                         <h2 className="section-label">Or Upload Session Audio</h2>
 
